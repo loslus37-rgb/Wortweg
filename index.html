@@ -470,11 +470,31 @@ function bestVoice(lang){
   const cands = voices.filter(v => (v.lang || "").toLowerCase().startsWith(two)).sort((a, b) => score(b) - score(a));
   return (voiceCache[lang] = cands[0] || null);
 }
+/* Aufgenommene KI-Stimmen (audio/<sprache>/<schlüssel>.mp3), sonst Gerätestimme */
+function speechText(text, lang){ return text.replace(/\s*\([^)]*\)/g, "").replace(/ (?=[^\x00-\x7F])/g, lang === "ja" ? "" : " ").trim(); }
+function audioKey(text){ let a = 0x811c9dc5, b = 0x01000193 ^ 0x9e3779b9; for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193) >>> 0; b = Math.imul(b ^ c, 0x5bd1e995) >>> 0; } return a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0"); }
+let AUDIO = {}, player = null;
+if (location.protocol.startsWith("http")) fetch("audio/manifest.json").then(r => r.ok ? r.json() : {}).then(m => { AUDIO = m || {}; }).catch(() => {});
 function speak(text, lang, slow){
+  if (AUDIO[lang]) {
+    try {
+      if (canSpeak) speechSynthesis.cancel();
+      if (player) player.pause();
+      player = new Audio("audio/" + lang + "/" + audioKey(speechText(text, lang)) + ".mp3");
+      player.playbackRate = slow ? 0.7 : 1;
+      let fell = false; const fallback = () => { if (!fell) { fell = true; speakDevice(text, lang, slow); } };
+      player.onerror = fallback;
+      player.play().catch(e => { if (e && e.name !== "NotAllowedError") fallback(); });
+      return;
+    } catch (e) {}
+  }
+  speakDevice(text, lang, slow);
+}
+function speakDevice(text, lang, slow){
   if (!canSpeak) return;
   try {
     speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/ (?=[^\x00-\x7F])/g, lang === "ja" ? "" : " "));
+    const u = new SpeechSynthesisUtterance(speechText(text, lang));
     u.lang = COURSES[lang].tts; u.rate = slow ? 0.6 : 0.9;
     const v = bestVoice(lang);
     if (v) u.voice = v;
