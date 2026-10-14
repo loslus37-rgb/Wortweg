@@ -1,5 +1,5 @@
 // Wortweg offline: App-Dateien beim Installieren speichern, Schriften beim ersten Laden.
-const VERSION = "wortweg-v5";
+const VERSION = "wortweg-v6";
 const AUDIO_CACHE = "wortweg-audio"; // Aufnahmen bleiben über App-Updates hinweg gespeichert
 const CORE = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
