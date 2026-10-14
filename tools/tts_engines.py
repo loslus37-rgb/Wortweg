@@ -1,5 +1,6 @@
 # Shared synthesis helpers: returns float32 mono numpy + sample rate
-import numpy as np, wave, io
+import numpy as np, wave, io, os
+THREADS = int(os.environ.get('TTS_THREADS', '1'))  # one thread per process, run one process per language
 LETTERS = {
  'ru': dict(zip('АБВГДЕЖИКЛМНОПРС', ['а','бэ','вэ','гэ','дэ','е','жэ','и','ка','эль','эм','эн','о','пэ','эр','эс'])),
  'ko': dict(zip('ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅎㅏㅓㅗㅜㅡㅣ', ['기역','니은','디귿','리을','미음','비읍','시옷','이응','지읒','히읗','아','어','오','우','으','이'])),
@@ -12,8 +13,9 @@ def synth(engine, voice, text, lang, speed=0.9):
     text = prep(text, lang)
     if engine == 'kokoro':
         if _k is None:
-            from kokoro_onnx import Kokoro
-            _k = Kokoro('/opt/models/kokoro-v1.0.onnx', '/opt/models/voices-v1.0.bin')
+            import onnxruntime as ort; from kokoro_onnx import Kokoro
+            o = ort.SessionOptions(); o.intra_op_num_threads = THREADS
+            _k = Kokoro.from_session(ort.InferenceSession('/opt/models/kokoro-v1.0.onnx', o), '/opt/models/voices-v1.0.bin')
         if lang == 'ja':
             if _jag is None:
                 from misaki import ja; _jag = ja.JAG2P()
@@ -23,7 +25,7 @@ def synth(engine, voice, text, lang, speed=0.9):
         return np.asarray(w, np.float32), sr
     if engine == 'supertonic':
         if _st is None:
-            from supertonic import TTS; _st = TTS(model='supertonic-3')
+            from supertonic import TTS; _st = TTS(model='supertonic-3', intra_op_num_threads=THREADS)
         if voice not in _styles: _styles[voice] = _st.get_voice_style(voice)
         w, _ = _st.synthesize(text, voice_style=_styles[voice], lang=lang, speed=speed, total_steps=10)
         return np.asarray(w, np.float32).squeeze(), _st.sample_rate
